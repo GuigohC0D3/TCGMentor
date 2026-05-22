@@ -66,6 +66,7 @@ export const chatApi = {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let streamError: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -79,8 +80,15 @@ export const chatApi = {
           if (!line.startsWith("data: ")) continue;
           const chunk = line.slice(6).trim();
           if (!chunk) continue;
-          if (chunk === "[DONE]") { onDone(conversationId); return; }
-          if (chunk.startsWith("[ERROR]")) throw new Error(chunk.slice(8));
+          if (chunk === "[DONE]") {
+            onDone(conversationId); // always save conversation ID
+            if (streamError) throw new Error(streamError);
+            return;
+          }
+          if (chunk.startsWith("[ERROR]")) {
+            streamError = chunk.slice(8); // buffer, don't throw yet
+            continue;
+          }
           onChunk(chunk);
         }
       }

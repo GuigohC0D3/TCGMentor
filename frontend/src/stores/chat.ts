@@ -51,11 +51,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   finishStreaming: (conversationId) => {
     const { streamingContent, messages, activeConversationId } = get();
+    const newMessages = streamingContent
+      ? [...messages, { role: "assistant" as const, content: streamingContent }]
+      : messages;
     set({
       isStreaming: false,
       streamingContent: "",
-      messages: [...messages, { role: "assistant", content: streamingContent }],
-      // Only update if we received a valid ID; keep existing otherwise
+      messages: newMessages,
       activeConversationId: conversationId || activeConversationId,
     });
   },

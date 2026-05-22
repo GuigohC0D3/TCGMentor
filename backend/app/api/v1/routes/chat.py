@@ -65,9 +65,14 @@ async def send_message_stream(payload: ChatRequest, current_user: CurrentUser, d
         title = payload.message[:60] + ("..." if len(payload.message) > 60 else "")
         await repo.update_title(conv.id, title)
 
+    # Commit early so the conversation is immediately visible in history
+    await db.commit()
+
     collected_chunks: list[str] = []
+    stream_error: str | None = None
 
     async def event_generator():
+        nonlocal stream_error
         try:
             async for chunk in chat_completion_stream(
                 payload.message, history, payload.tcg_context or conv.tcg_context
@@ -76,16 +81,18 @@ async def send_message_stream(payload: ChatRequest, current_user: CurrentUser, d
                 yield f"data: {chunk}\n\n"
         except Exception as exc:
             logger.error("HuggingFace streaming error: %s", exc, exc_info=True)
+            stream_error = str(exc)
             yield f"data: [ERROR] {exc}\n\n"
-            return
 
+        # Always reach [DONE] so the frontend gets the conversation ID
         full_response = "".join(collected_chunks)
-        try:
-            await repo.add_message(
-                conv.id, "assistant", full_response, meta={"model": settings.HF_MODEL, "streamed": True}
-            )
-        except Exception:
-            pass
+        if full_response:
+            try:
+                await repo.add_message(
+                    conv.id, "assistant", full_response, meta={"model": settings.HF_MODEL, "streamed": True}
+                )
+            except Exception:
+                pass
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
