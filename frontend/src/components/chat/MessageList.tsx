@@ -61,7 +61,7 @@ export function MessageList({
         ))}
         {isStreaming && (
           <MessageRow
-            message={{ role: "assistant", content: streamingContent }}
+            message={{ role: "assistant", content: streamingContent ?? "" }}
             isStreaming
           />
         )}
