@@ -10,7 +10,7 @@ import { useAuthStore } from "@/stores/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const setUser = useAuthStore((s) => s.setUser);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await authApi.login({ email, password });
-      setAuth(res.data.user, res.data.access_token);
+      setUser(res.data.user);
       router.replace("/chat");
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "Invalid credentials");

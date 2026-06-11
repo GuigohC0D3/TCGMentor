@@ -1,8 +1,10 @@
 import json
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_SECRET = "change-me-in-production-use-openssl-rand-hex-32"
 
 
 class Settings(BaseSettings):
@@ -42,23 +44,32 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # Auth
-    SECRET_KEY: str = "change-me-in-production-use-openssl-rand-hex-32"
+    SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     @field_validator("SECRET_KEY")
     @classmethod
-    def secret_key_must_be_set(cls, v: str) -> str:
-        if v == "change-me-in-production-use-openssl-rand-hex-32":
+    def secret_key_min_length(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters")
+        return v
+
+    @model_validator(mode="after")
+    def secret_key_not_default_in_production(self) -> "Settings":
+        if self.SECRET_KEY == _DEFAULT_SECRET:
+            if self.ENVIRONMENT.lower() == "production":
+                raise ValueError(
+                    "SECRET_KEY is using the default value in production. "
+                    "Generate one with: openssl rand -hex 32"
+                )
             import warnings
             warnings.warn(
                 "SECRET_KEY is using the default insecure value. "
                 "Generate one with: openssl rand -hex 32",
                 stacklevel=2,
             )
-        if len(v) < 32:
-            raise ValueError("SECRET_KEY must be at least 32 characters")
-        return v
+        return self
 
     # HuggingFace Inference API (OpenAI-compatible)
     HF_TOKEN: str

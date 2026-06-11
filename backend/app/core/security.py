@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 from app.core.config import settings
+
+AUTH_COOKIE = "access_token"
 
 
 def hash_password(password: str) -> str:
@@ -11,7 +13,10 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except ValueError:
+        return False
 
 
 def create_access_token(subject: str) -> str:
@@ -24,7 +29,12 @@ def create_access_token(subject: str) -> str:
 
 def decode_access_token(token: str) -> str | None:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"require": ["exp", "sub"]},
+        )
         return payload.get("sub")
-    except JWTError:
+    except jwt.InvalidTokenError:
         return None

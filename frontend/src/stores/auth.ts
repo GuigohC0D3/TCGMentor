@@ -2,30 +2,32 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "@/types";
 
+// The JWT lives in an httpOnly cookie managed by the backend.
+// This store only mirrors the user profile for the UI.
 interface AuthStore {
   user: User | null;
-  token: string | null;
   _hasHydrated: boolean;
+  authChecked: boolean;
   setHasHydrated: (v: boolean) => void;
-  setAuth: (user: User, token: string) => void;
+  setUser: (user: User | null) => void;
+  setAuthChecked: (v: boolean) => void;
   logout: () => void;
-  isAuthenticated: () => boolean;
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
-      token: null,
       _hasHydrated: false,
+      authChecked: false,
       setHasHydrated: (v) => set({ _hasHydrated: v }),
-      setAuth: (user, token) => set({ user, token }),
-      logout: () => set({ user: null, token: null }),
-      isAuthenticated: () => !!get().token,
+      setUser: (user) => set({ user }),
+      setAuthChecked: (v) => set({ authChecked: v }),
+      logout: () => set({ user: null }),
     }),
     {
       name: "tcgmentor_auth",
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      partialize: (state) => ({ user: state.user }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

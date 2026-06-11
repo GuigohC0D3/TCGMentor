@@ -5,14 +5,14 @@ import { PenSquare, MessageSquare, Trash2, LogOut } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import logo from "@/assets/TCGMentor.png";
-import { chatApi } from "@/lib/api";
+import { authApi, chatApi } from "@/lib/api";
 import { useChatStore } from "@/stores/chat";
 import { useAuthStore } from "@/stores/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 export function ConversationSidebar() {
-  const { token, user, logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const router = useRouter();
   const {
     conversations,
@@ -28,14 +28,13 @@ export function ConversationSidebar() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token || isStreaming) return;
+    if (isStreaming) return;
     chatApi.getConversations().then((res) => setConversations(res.data)).catch(() => {});
-  }, [token, isStreaming]);
+  }, [isStreaming]);
 
   const handleSelect = async (id: string) => {
     if (activeConversationId === id) return;
     setActiveConversation(id);
-    if (!token) return;
     try {
       const res = await chatApi.getConversation(id);
       setMessages(res.data.messages ?? []);
@@ -139,7 +138,11 @@ export function ConversationSidebar() {
             )}
           </div>
           <button
-            onClick={() => { logout(); router.replace("/login"); }}
+            onClick={async () => {
+              try { await authApi.logout(); } catch {}
+              logout();
+              router.replace("/login");
+            }}
             aria-label="Sign out"
             className="flex-shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
           >

@@ -10,7 +10,7 @@ import { useAuthStore } from "@/stores/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const setUser = useAuthStore((s) => s.setUser);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,7 +23,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const res = await authApi.register({ email, password, full_name: fullName || undefined });
-      setAuth(res.data.user, res.data.access_token);
+      setUser(res.data.user);
       router.replace("/chat");
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "Could not create account");

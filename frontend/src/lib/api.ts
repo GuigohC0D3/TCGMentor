@@ -1,17 +1,12 @@
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
+// All requests go through the Next.js rewrite (/api/backend -> backend /api/v1)
+// so the httpOnly auth cookie is first-party and sent automatically.
 export const api = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: "/api/backend",
   headers: { "Content-Type": "application/json" },
-});
-
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  withCredentials: true,
 });
 
 api.interceptors.response.use(
@@ -19,7 +14,13 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       useAuthStore.getState().logout();
-      if (typeof window !== "undefined") window.location.href = "/login";
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login") &&
+        !window.location.pathname.startsWith("/register")
+      ) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(err);
   }
@@ -31,6 +32,7 @@ export const authApi = {
     api.post("/auth/register", data),
   login: (data: { email: string; password: string }) =>
     api.post("/auth/login", data),
+  logout: () => api.post("/auth/logout"),
   me: () => api.get("/auth/me"),
 };
 
@@ -47,16 +49,13 @@ export const chatApi = {
 
   streamMessage: (
     data: { conversation_id?: string; message: string; tcg_context?: string | null },
-    token: string,
     onChunk: (chunk: string) => void,
     onDone: (conversationId: string | null) => void,
   ) => {
+    // Same-origin request: the auth cookie is sent automatically
     return fetch("/api/chat/stream", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(async (res) => {
       if (!res.ok) {

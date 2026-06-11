@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { AlertCircle, X, RotateCcw } from "lucide-react";
 import { chatApi } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth";
 import { useChatStore } from "@/stores/chat";
 import type { TCGContext } from "@/types";
 import { MessageInput } from "./MessageInput";
@@ -18,7 +17,6 @@ const TCG_LABELS: Record<string, string> = {
 };
 
 export function ChatInterface() {
-  const { token } = useAuthStore();
   const {
     messages,
     isStreaming,
@@ -37,8 +35,6 @@ export function ChatInterface() {
   const [lastMessage, setLastMessage] = useState<string | null>(null);
 
   const handleSend = async (message: string) => {
-    if (!token) return;
-
     setLastMessage(message);
     addMessage({ role: "user", content: message });
     startStreaming();
@@ -50,7 +46,6 @@ export function ChatInterface() {
           message,
           tcg_context: tcgContext,
         },
-        token,
         (chunk) => appendStreamChunk(chunk),
         (conversationId) => finishStreaming(conversationId),
       );

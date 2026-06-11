@@ -4,21 +4,20 @@ import { useEffect, useRef } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/lib/api";
 
+// Validates the httpOnly cookie session once per app load.
 export function useAuthInit() {
-  const { token, setAuth, logout } = useAuthStore();
-  const verified = useRef(false);
+  const setUser = useAuthStore((s) => s.setUser);
+  const setAuthChecked = useAuthStore((s) => s.setAuthChecked);
+  const ran = useRef(false);
 
   useEffect(() => {
-    if (!token || verified.current) return;
-    verified.current = true;
+    if (ran.current) return;
+    ran.current = true;
 
-    let cancelled = false;
-    authApi.me().then((res) => {
-      if (!cancelled) setAuth(res.data, token);
-    }).catch(() => {
-      if (!cancelled) logout();
-    });
-
-    return () => { cancelled = true; };
-  }, [token]);
+    authApi
+      .me()
+      .then((res) => setUser(res.data))
+      .catch(() => setUser(null))
+      .finally(() => setAuthChecked(true));
+  }, [setUser, setAuthChecked]);
 }

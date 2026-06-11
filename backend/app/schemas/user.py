@@ -19,8 +19,9 @@ class UserCreate(BaseModel):
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
-        if len(v) > 128:
-            raise ValueError("Password too long")
+        # bcrypt silently ignores everything past 72 bytes
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password too long (max 72 bytes)")
         return v
 
 
@@ -39,7 +40,7 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+class AuthResponse(BaseModel):
+    """Token is delivered via httpOnly cookie, never in the body."""
+
     user: UserResponse

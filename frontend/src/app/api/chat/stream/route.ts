@@ -7,7 +7,7 @@ const BACKEND =
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  const auth = req.headers.get("Authorization") ?? "";
+  const cookie = req.headers.get("cookie") ?? "";
 
   let upstream: Response;
   try {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: auth,
+        Cookie: cookie,
       },
       body,
     });
