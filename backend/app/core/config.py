@@ -73,7 +73,8 @@ class Settings(BaseSettings):
 
     # HuggingFace Inference API (OpenAI-compatible)
     HF_TOKEN: str
-    HF_BASE_URL: str = "https://api-inference.huggingface.co/v1"
+    # Legacy api-inference.huggingface.co was shut down; router is the current endpoint
+    HF_BASE_URL: str = "https://router.huggingface.co/v1"
     HF_MODEL: str = "Qwen/Qwen2.5-72B-Instruct"
     HF_EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 
