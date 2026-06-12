@@ -6,7 +6,9 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: tcgmentor
     ports:
-      - "5432:5432"
+      # Host port 5433 to avoid clashing with other local postgres instances;
+      # containers reach it as postgres:5432 over the compose network
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,7 +19,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
 
@@ -47,6 +49,10 @@ services:
       - .env
     environment:
       BACKEND_URL: http://backend:8000
+      # File-change events don't cross Windows bind mounts; poll instead
+      # so the dev server picks up edits made on the host
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     depends_on:
       - backend
     volumes:
