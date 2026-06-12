@@ -41,6 +41,10 @@ class ChatRequest(BaseModel):
         return v
 
 
+class RegenerateRequest(BaseModel):
+    conversation_id: uuid.UUID
+
+
 class ChatResponse(BaseModel):
     conversation_id: uuid.UUID
     message_id: uuid.UUID

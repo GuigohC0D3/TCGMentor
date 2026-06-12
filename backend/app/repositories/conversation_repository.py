@@ -29,14 +29,19 @@ class ConversationRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_by_user(self, user_id: uuid.UUID, limit: int = 50) -> list[Conversation]:
-        result = await self.db.execute(
+    async def list_by_user(
+        self, user_id: uuid.UUID, limit: int = 50, search: str | None = None
+    ) -> list[Conversation]:
+        query = (
             select(Conversation)
             .options(selectinload(Conversation.messages))
             .where(Conversation.user_id == user_id)
             .order_by(Conversation.updated_at.desc())
             .limit(limit)
         )
+        if search:
+            query = query.where(Conversation.title.ilike(f"%{search}%"))
+        result = await self.db.execute(query)
         return list(result.scalars().all())
 
     async def add_message(
@@ -55,6 +60,16 @@ class ConversationRepository:
         )
         await self.db.flush()
         return msg
+
+    async def delete_last_assistant_message(self, conversation_id: uuid.UUID) -> None:
+        last = (
+            select(Message.id)
+            .where(Message.conversation_id == conversation_id, Message.role == "assistant")
+            .order_by(Message.created_at.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        await self.db.execute(delete(Message).where(Message.id == last))
 
     async def update_title(self, conversation_id: uuid.UUID, title: str) -> None:
         await self.db.execute(

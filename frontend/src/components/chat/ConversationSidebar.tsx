@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { PenSquare, MessageSquare, Trash2, LogOut } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { PenSquare, MessageSquare, Trash2, LogOut, Search, Layers } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import logo from "@/assets/TCGMentor.png";
@@ -26,6 +27,15 @@ export function ConversationSidebar() {
   } = useChatStore();
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((c) =>
+      (c.title ?? c.last_message ?? "").toLowerCase().includes(q)
+    );
+  }, [conversations, search]);
 
   useEffect(() => {
     if (isStreaming) return;
@@ -65,7 +75,7 @@ export function ConversationSidebar() {
         <ThemeToggle />
       </div>
 
-      <div className="px-3 mb-2 flex-shrink-0">
+      <div className="px-3 mb-2 flex-shrink-0 space-y-0.5">
         <button
           onClick={reset}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
@@ -73,15 +83,32 @@ export function ConversationSidebar() {
           <PenSquare className="h-4 w-4" />
           New Chat
         </button>
+        <Link
+          href="/decks"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+        >
+          <Layers className="h-4 w-4" />
+          My Decks
+        </Link>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search chats..."
+            className="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-600 pl-8 pr-3 py-1.5 text-sm text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 outline-none transition-colors"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-0.5">
-        {conversations.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="text-xs text-zinc-400 dark:text-zinc-600 px-3 py-8 text-center">
-            No conversations yet
+            {search ? "No matches" : "No conversations yet"}
           </p>
         ) : (
-          conversations.map((conv) => (
+          filtered.map((conv) => (
             <div
               key={conv.id}
               className={cn(

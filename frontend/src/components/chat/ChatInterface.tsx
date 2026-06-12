@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, X, RotateCcw } from "lucide-react";
+import { AlertCircle, X, RotateCcw, Download, RefreshCw } from "lucide-react";
 import { chatApi } from "@/lib/api";
 import { useChatStore } from "@/stores/chat";
 import type { TCGContext } from "@/types";
@@ -25,6 +25,7 @@ export function ChatInterface() {
     tcgContext,
     error,
     addMessage,
+    setMessages,
     startStreaming,
     appendStreamChunk,
     finishStreaming,
@@ -68,15 +69,72 @@ export function ChatInterface() {
     if (messages.length === 0) setTcgContext(ctx);
   };
 
+  const handleRegenerate = async () => {
+    if (!activeConversationId || isStreaming) return;
+    setError(null);
+    // Drop the last assistant message locally; the backend does the same
+    const trimmed =
+      messages[messages.length - 1]?.role === "assistant" ? messages.slice(0, -1) : messages;
+    setMessages(trimmed);
+    startStreaming();
+    try {
+      await chatApi.regenerate(
+        activeConversationId,
+        (chunk) => appendStreamChunk(chunk),
+        (conversationId) => finishStreaming(conversationId),
+      );
+    } catch (err) {
+      finishStreaming(activeConversationId);
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(raw.replace(/^Stream failed: \d+\s*/, "").trim() || "Falha ao regenerar.");
+    }
+  };
+
+  const handleExport = () => {
+    const lines = messages.map((m) =>
+      m.role === "user" ? `**Você:** ${m.content}` : `**TCGMentor:** ${m.content}`
+    );
+    const md = `# Conversa TCGMentor\n\n${lines.join("\n\n---\n\n")}\n`;
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tcgmentor-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const hasMessages = messages.length > 0 || isStreaming;
+  const canRegenerate =
+    !isStreaming && !!activeConversationId && messages[messages.length - 1]?.role === "assistant";
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-zinc-900">
-      {hasMessages && tcgContext && (
-        <div className="flex-shrink-0 flex items-center justify-center py-2 border-b border-zinc-100 dark:border-zinc-800">
+      {hasMessages && (
+        <div className="flex-shrink-0 flex items-center justify-center gap-2 py-2 border-b border-zinc-100 dark:border-zinc-800 relative">
           <span className="text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-full px-3 py-1">
-            {TCG_LABELS[tcgContext]}
+            {tcgContext ? TCG_LABELS[tcgContext] : "💬 Chat"}
           </span>
+          <div className="absolute right-4 flex items-center gap-1">
+            {canRegenerate && (
+              <button
+                onClick={handleRegenerate}
+                title="Regenerar última resposta"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {messages.length > 0 && (
+              <button
+                onClick={handleExport}
+                title="Exportar conversa (.md)"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
 

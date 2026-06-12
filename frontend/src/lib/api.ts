@@ -36,12 +36,72 @@ export const authApi = {
   me: () => api.get("/auth/me"),
 };
 
+// --- SSE helper ---
+// Same-origin requests: the auth cookie is sent automatically
+async function streamSSE(
+  url: string,
+  body: unknown,
+  onChunk: (chunk: string) => void,
+  onDone: (conversationId: string | null) => void,
+) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    if (res.status === 429) {
+      const detail = await res.json().then((d) => d?.detail).catch(() => null);
+      throw new Error(detail ?? "Limite de mensagens atingido. Tente mais tarde.");
+    }
+    throw new Error(`Stream failed: ${res.status}`);
+  }
+  const conversationId = res.headers.get("X-Conversation-Id");
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let streamError: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice(6);
+      const sentinel = payload.trim();
+      if (!sentinel) continue;
+      if (sentinel === "[DONE]") {
+        onDone(conversationId); // always save conversation ID
+        if (streamError) throw new Error(streamError);
+        return;
+      }
+      if (sentinel.startsWith("[ERROR]")) {
+        streamError = sentinel.slice(8); // buffer, don't throw yet
+        continue;
+      }
+      // Content chunks are JSON-encoded strings so whitespace and
+      // newlines survive SSE framing
+      try {
+        onChunk(JSON.parse(sentinel));
+      } catch {
+        onChunk(payload);
+      }
+    }
+  }
+}
+
 // --- Chat ---
 export const chatApi = {
   sendMessage: (data: { conversation_id?: string; message: string; tcg_context?: string | null }) =>
-    api.post("/chat/", data),
+    api.post("/chat", data),
 
-  getConversations: () => api.get("/chat/conversations"),
+  getConversations: (q?: string) =>
+    api.get("/chat/conversations", { params: q ? { q } : undefined }),
 
   getConversation: (id: string) => api.get(`/chat/conversations/${id}`),
 
@@ -51,46 +111,52 @@ export const chatApi = {
     data: { conversation_id?: string; message: string; tcg_context?: string | null },
     onChunk: (chunk: string) => void,
     onDone: (conversationId: string | null) => void,
-  ) => {
-    // Same-origin request: the auth cookie is sent automatically
-    return fetch("/api/chat/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }).then(async (res) => {
-      if (!res.ok) {
-        throw new Error(`Stream failed: ${res.status}`);
-      }
-      const conversationId = res.headers.get("X-Conversation-Id");
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let streamError: string | null = null;
+  ) => streamSSE("/api/chat/stream", data, onChunk, onDone),
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+  regenerate: (
+    conversationId: string,
+    onChunk: (chunk: string) => void,
+    onDone: (conversationId: string | null) => void,
+  ) =>
+    streamSSE("/api/chat/regenerate", { conversation_id: conversationId }, onChunk, onDone),
+};
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+// --- Users ---
+export const usersApi = {
+  updateMe: (data: { full_name?: string; skill_level?: string; preferred_tcg?: string }) =>
+    api.patch("/users/me", data),
+};
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const chunk = line.slice(6).trim();
-          if (!chunk) continue;
-          if (chunk === "[DONE]") {
-            onDone(conversationId); // always save conversation ID
-            if (streamError) throw new Error(streamError);
-            return;
-          }
-          if (chunk.startsWith("[ERROR]")) {
-            streamError = chunk.slice(8); // buffer, don't throw yet
-            continue;
-          }
-          onChunk(chunk);
-        }
-      }
-    });
-  },
+// --- Decks ---
+export const decksApi = {
+  list: () => api.get("/decks"),
+  get: (id: string) => api.get(`/decks/${id}`),
+  create: (data: { name: string; tcg: string; cards: { name: string; quantity: number }[] }) =>
+    api.post("/decks", data),
+  update: (id: string, data: { name?: string; cards?: { name: string; quantity: number }[] }) =>
+    api.put(`/decks/${id}`, data),
+  remove: (id: string) => api.delete(`/decks/${id}`),
+  analyze: (id: string) => api.post(`/decks/${id}/analyze`),
+};
+
+// --- Cards ---
+export interface CardFilters {
+  type?: string;
+  color?: string;
+  rarity?: string;
+}
+
+export const cardsApi = {
+  search: (tcg: string, q: string, filters: CardFilters = {}, limit = 20, signal?: AbortSignal) =>
+    api.get("/cards/search", {
+      signal,
+      params: {
+        tcg,
+        ...(q ? { q } : {}),
+        ...(filters.type ? { type: filters.type } : {}),
+        ...(filters.color ? { color: filters.color } : {}),
+        ...(filters.rarity ? { rarity: filters.rarity } : {}),
+        limit,
+      },
+    }),
 };
