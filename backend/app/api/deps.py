@@ -4,8 +4,11 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import datetime, timezone
+
+from app.core.config import settings
 from app.core.database import get_db
-from app.core.rate_limit import check_rate
+from app.core.rate_limit import check_daily_quota, check_rate
 from app.core.security import AUTH_COOKIE, decode_access_token
 from app.models.user import User
 
@@ -62,3 +65,13 @@ def rate_limit_user(scope: str, times: int, seconds: int = 60):
         await check_rate(f"rl:{scope}:{current_user.id}", times, seconds)
 
     return dependency
+
+
+async def enforce_message_quota(current_user: CurrentUser) -> None:
+    """Daily message cap for free accounts; premium is unlimited."""
+    if current_user.is_premium:
+        return
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    await check_daily_quota(
+        f"quota:msgs:{current_user.id}:{today}", settings.FREE_DAILY_MESSAGE_LIMIT
+    )

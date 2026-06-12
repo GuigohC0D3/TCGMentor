@@ -24,7 +24,7 @@ export default function RegisterPage() {
     try {
       const res = await authApi.register({ email, password, full_name: fullName || undefined });
       setUser(res.data.user);
-      router.replace("/chat");
+      router.replace("/onboarding");
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "Could not create account");
     } finally {

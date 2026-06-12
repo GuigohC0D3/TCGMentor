@@ -30,11 +30,33 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    skill_level: str | None = None
+    preferred_tcg: str | None = None
+
+    @field_validator("skill_level")
+    @classmethod
+    def valid_skill_level(cls, v: str | None) -> str | None:
+        if v is not None and v not in {"beginner", "intermediate", "advanced"}:
+            raise ValueError(f"Invalid skill_level: {v}")
+        return v
+
+    @field_validator("preferred_tcg")
+    @classmethod
+    def valid_preferred_tcg(cls, v: str | None) -> str | None:
+        if v is not None and v not in {"pokemon", "magic", "yugioh", "lorcana", "onepiece"}:
+            raise ValueError(f"Invalid preferred_tcg: {v}")
+        return v
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str | None
     is_premium: bool
+    skill_level: str | None = None
+    preferred_tcg: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -123,13 +123,31 @@ GAME_SPECIFIC_KNOWLEDGE = {
 }
 
 
-def build_system_prompt(tcg_context: str | None = None) -> str:
+SKILL_LEVEL_ADDENDUM = {
+    "beginner": """
+## User Skill Level: Beginner
+This user is new to TCGs. Assume zero prior knowledge, explain every term the first time you use it, and lean heavily on analogies.
+""",
+    "intermediate": """
+## User Skill Level: Intermediate
+This user knows the basics (turn structure, card types, win conditions). Skip fundamental explanations unless asked; focus on strategy, deck building, and intermediate mechanics.
+""",
+    "advanced": """
+## User Skill Level: Advanced
+This user is an experienced player. Be direct and technical: discuss meta archetypes, matchup theory, sideboarding, and competitive lines without simplifying.
+""",
+}
+
+
+def build_system_prompt(tcg_context: str | None = None, skill_level: str | None = None) -> str:
     if tcg_context and tcg_context in TCG_CONTEXTS:
         game_name = TCG_CONTEXTS[tcg_context]
         addendum = GAME_CONTEXT_ADDENDUM.format(game_name=game_name)
         knowledge = GAME_SPECIFIC_KNOWLEDGE.get(tcg_context, "")
-        return SYSTEM_PROMPT_BASE + addendum + knowledge
-    return SYSTEM_PROMPT_BASE + GENERAL_CONTEXT_ADDENDUM
+        prompt = SYSTEM_PROMPT_BASE + addendum + knowledge
+    else:
+        prompt = SYSTEM_PROMPT_BASE + GENERAL_CONTEXT_ADDENDUM
+    return prompt + SKILL_LEVEL_ADDENDUM.get(skill_level or "", "")
 
 
 def build_history_messages(

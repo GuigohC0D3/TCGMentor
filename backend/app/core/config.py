@@ -83,8 +83,21 @@ class Settings(BaseSettings):
     CHROMA_PORT: int = 8000
     CHROMA_COLLECTION_TCG: str = "tcg_knowledge"
 
+    # Card game APIs (free public APIs; override if self-hosting a mirror)
+    SCRYFALL_API_URL: str = "https://api.scryfall.com"
+    POKEMONTCG_API_URL: str = "https://api.pokemontcg.io/v2"
+    # Optional: raises pokemontcg.io rate limit from 1k to 20k req/day
+    # Get one at https://dev.pokemontcg.io
+    POKEMONTCG_API_KEY: str = ""
+    YGOPRODECK_API_URL: str = "https://db.ygoprodeck.com/api/v7"
+    LORCAST_API_URL: str = "https://api.lorcast.com/v0"
+
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 20
+
+    # Free-tier quota (premium users are unlimited)
+    FREE_DAILY_MESSAGE_LIMIT: int = 30
+    FREE_DAILY_DECK_ANALYSES: int = 3
 
 
 @lru_cache

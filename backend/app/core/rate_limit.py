@@ -10,6 +10,10 @@ logger = logging.getLogger(__name__)
 _redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
+def get_redis() -> aioredis.Redis:
+    return _redis
+
+
 async def check_rate(key: str, times: int, seconds: int) -> None:
     try:
         async with _redis.pipeline(transaction=True) as pipe:
@@ -24,6 +28,23 @@ async def check_rate(key: str, times: int, seconds: int) -> None:
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many requests, please try again later",
         )
+
+
+async def check_daily_quota(
+    key: str,
+    limit: int,
+    detail: str = "Daily free message limit reached. Upgrade to premium for unlimited messages.",
+) -> None:
+    """Daily quota for free users (premium users skip this entirely)."""
+    try:
+        async with _redis.pipeline(transaction=True) as pipe:
+            count, _ = await pipe.incr(key).expire(key, 86400, nx=True).execute()
+    except Exception as exc:
+        logger.warning("Quota check unavailable, allowing request: %s", exc)
+        return
+
+    if count > limit:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
 
 
 def rate_limit_ip(scope: str, times: int, seconds: int = 60):
